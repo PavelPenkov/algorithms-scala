@@ -1,0 +1,1 @@
+Classic algorithm's implementation in Scala
