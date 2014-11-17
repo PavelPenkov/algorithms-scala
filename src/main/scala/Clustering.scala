@@ -18,8 +18,8 @@ object Clustering extends App {
   val g = new WeightedGraph(n)
 
   src foreach { s =>
-    s split "\\s" match {
-      case Array(u, v, w) => g.addEdge(u.toInt - 1, v.toInt - 1, w.toInt)
+    s split "\\s" map (_.toInt) match {
+      case Array(u, v, w) => g.addEdge(u - 1, v - 1, w)
     }
   }
 

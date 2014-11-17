@@ -71,6 +71,41 @@ class WeightedDigraph(val n: Integer) {
     }
     Right(current)
   }
+
+  def reversed: WeightedDigraph = {
+    val r = WeightedDigraph(n)
+    for(u <- 0 until n; edge <- adj(u)) {
+      r.addEdge(edge.to, u, edge.weight)
+    }
+    r
+  }
+
+  def bellmanFord(start: Int) : Either[Int, Seq[Long]] = {
+    var prev = Array.ofDim[Long](n)
+    val current = Array.ofDim[Long](n)
+    // Base case, length is zero
+    for(v <- 0 until n) {
+      prev(v) = if(v == start) 0l else Long.MaxValue
+    }
+    val r = reversed
+    for(length <- 1 until n; v <- 0 until n) {
+      val inherited = prev(v)
+      val cd = r.adj(v).map  { edge =>
+        if (prev(edge.to) == Long.MaxValue) Long.MaxValue else prev(edge.to) + edge.weight
+      }.min
+      current(v) = math.min(inherited, cd)
+      prev = current
+    }
+    // Checking for negative cycles, if a path of length N is better then there's a negative cycle
+    for(v <- 0 until n) {
+      val inherited = prev(v)
+      val cd = r.adj(v).map  { edge =>
+        if (prev(edge.to) == Long.MaxValue) Long.MaxValue else prev(edge.to) + edge.weight
+      }.min
+      if(math.min(inherited, cd) < prev(v)) return Left(v)
+    }
+    Right(current.toSeq)
+  }
 }
 
 object WeightedDigraph {
