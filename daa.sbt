@@ -4,8 +4,8 @@ version := "0.0.1"
 
 scalaVersion := "2.11.4"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.0" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.1" % "test"
 
 fork in run := true
 
-javaOptions in run += "-Xmx8192M"
+javaOptions in run ++= Seq("-Xmx4G","-Xms4G", "-Xss64M")

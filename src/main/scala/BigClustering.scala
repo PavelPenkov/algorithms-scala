@@ -17,19 +17,11 @@ object BigClustering extends App {
     neighborsIter(s, dist, 0)
   }
 
-
-  def fromBitString(s: String): BitString =  s.split("\\s+").reverse.zipWithIndex.foldLeft(0) { case (acc, ("0",_)) => acc
-      case (acc, ("1", index)) => acc + (1 << index)
-  }
-
-
+  def fromBitString(s: String): BitString =  Integer.parseInt(s.replaceAll("\\s+", ""), 2)
 
   def hammingDistance(x: Int, y: Int) = {
     var dist = 0
-    var value = 0
-
-    value = x ^ y
-
+    var value = x ^ y
     while(value != 0) {
       dist+=1
       value = value & (value -1)
@@ -38,55 +30,22 @@ object BigClustering extends App {
   }
 
 
-  //val strings = Source.fromFile("clustering_big.txt").getLines().drop(1).toList
-  val n = 500
-  val coords = Source.fromFile("clustering_big.txt").getLines().drop(1).take(n).map(fromBitString).toSeq
-
+  val src = Source.fromFile("clustering_big.txt")
+  val lines = src.getLines()
+  val length = lines.next().split("\\s+").map(_.toInt) match {
+    case Array(_, l) => l
+  }
+  val coords = lines.map(fromBitString).toIndexedSeq
+  src.close()
+  val coordsToVertex = coords.zipWithIndex.groupBy(_._2).mapValues(_.unzip._2).withDefaultValue(List.empty[Int])
+  val uf = UnionFind(coords.size)
   val spacing = 3
-  val uf = UnionFind(n)
-
-  (for (i <- 0 until n;  j <- i until n) yield (i, j)).foreach { case (u, v) =>
-    val dist = hammingDistance(coords(u), coords(v))
-    if (dist < spacing) {
-      if (u != v) println(s"Connecting $u at ${coords(u)} and $v at ${coords(v)} with dist $dist")
-      uf.union(u, v)
-    }
+  for { spc <- 0 until spacing
+    i <- 0 until coords.length
+    neighborCoords <- neighbors(coords(i), spc, length)
+    neighbor <- coordsToVertex(neighborCoords)
+  } {
+    uf.union(i, neighbor)
   }
-
-  println(uf.components)
-
-
-
-
-  /*
-  val vertices = strings.zipWithIndex.map { case (s, i) =>
-    val bitString: BitString = s.split("\\s+").zipWithIndex.foldLeft(0) {
-      case (acc, ("0", _)) => acc
-      case (acc, ("1", index)) => acc + (1 << index)
-    }
-    new {val coords = bitString; val index = i}
-  }
-
-  val vertexToCoords = scala.collection.mutable.Map[Int, BitString]()
-  val coordsToVertex = scala.collection.mutable.Map[BitString, List[Int]]().withDefaultValue(List())
-
-
-  vertices foreach { v =>
-    vertexToCoords(v.index) = v.coords
-    coordsToVertex(v.coords) = v.index::coordsToVertex(v.coords)
-  }
-
-  val uf = UnionFind(vertices.size)
-  println(s"Size: ${vertices.size}")
-  val dist = 3
-
-  vertices foreach { i =>
-    //println(s"Processing vertex ${i.index}")
-    neighbors(i.coords, dist, 24) foreach { n =>
-      coordsToVertex(n) foreach {v =>
-        uf.union(i.index, v)
-      }
-    }
-  }
-  */
+  println(s"${uf.components}")
 }

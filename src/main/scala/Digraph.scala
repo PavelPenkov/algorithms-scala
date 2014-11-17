@@ -1,135 +1,49 @@
 import scala.collection.mutable
+import scala.util.control.Breaks._
 import scala.io.Source
 import scala.None
 
 object Digraph {
-  def apply(n: Int) = new Digraph(n, Vector.fill(n)(List.empty[Int]))
+  def apply(n: Int) = new Digraph(n)
+
+  def fromFile(filename: String) = {
+    val src = Source fromFile filename getLines
+    val n = src.next().toInt
+    val g = new Digraph(n)
+    for (s <- src) {
+      s split "\\s+" map (_.toInt) match {
+        case Array(u, v) => g.addEdge(u - 1, v - 1)
+      }
+    }
+    g
+  }
 }
 
-class Digraph private (val n: Int, val adj: Vector[List[Int]])  {
-  def addEdge(tail: Int, head: Int) = new Digraph(n, adj.updated(tail, head :: adj(tail)))
+class Digraph private(val n: Int) {
+  private val adj = Array.fill(n) {
+    List.empty[Int]
+  }
+  private var m = 0
 
-  def addEdge(e: (Int, Int)): Digraph = addEdge(e._1, e._2)
-
-  def postOrder(s: Int) = {
-    val visited = Array.fill(n)(false)
-    val ordered = mutable.Queue[Int]()
-
-    def _dfs(v: Int) {
-      adj(v).filterNot(visited).foreach(_dfs)
-      ordered.enqueue(v)
-    }
-
-    _dfs(s)
-    ordered.iterator
+  def addEdge(u: Int, v: Int) = {
+    adj(u) = v :: adj(u)
+    m += 1
+    this
   }
 
-  def postOrder = {
-    val visited = Array.fill(n)(false)
-    val ordered = mutable.Queue[Int]()
+  def M = m
 
-    def _dfs(v: Int) {
-      visited(v) = true
-      for(x <- adj(v)) {
-        if(!visited(x))  _dfs(x)
-      }
-      ordered.enqueue(v)
-    }
-
-    for(v <- 0 until n) {
-      if(!visited(v)) {
-        _dfs(v)
-      }
-    }
-
-    ordered
-  }
-
-  def dfsLoop(vs: Iterable[Int]): Iterable[Int] = {
-    val visited = Array.fill(n)(false)
-    val ordered = mutable.Queue[Int]()
-    val stack = mutable.Stack[Int]()
-
-    for(v <- vs) {
-      if(!visited(v)) {
-        stack.push(v)
-        visited(v) = true
-        while(!stack.isEmpty) {
-          val c = stack.pop()
-
-          if(adj(c).filterNot(visited).isEmpty) ordered.enqueue(c)
-
-          for(n <- adj(c)) {
-            if(!visited(n)) {
-              visited(n) = true
-              stack.push(n)
-            }
-          }
-          if(stack.isEmpty) ordered.enqueue(c)
-        }
-      }
-    }
-    ordered
-  }
-
-  def dfsLoop: Iterable[Int] = dfsLoop(1 until n)
-
-  def edges =  for(i <- 0 until n; head <- adj(i) ) yield (i, head)
-
-  lazy val reversed = edges.foldLeft(Digraph(n)){ case(g, (tail, head)) => g addEdge (head, tail)}
-
-  def sccRec = {
-    val visited = Array.fill(n)(false)
-    val finishingTimes = Array.fill(n)(0)
-    val leaders = Array.fill(n)(0)
-    var t = 0
-
-    def _dfs(x: Int) {
-      visited(x) = true
-      reversed.adj(x) foreach { tail => if(!visited(tail)) _dfs(tail) }
-      finishingTimes(x) = t
-      t+=1
-    }
-
-    for(v <- 0 until n) {
-      if(!visited(v)) _dfs(v)
-    }
-    finishingTimes
-  }
-
-  def dfsLoop2(f: Int => Unit) {
+  def dfsLoop(order: Iterable[Int])(f: (Int, Int) => Unit) {
     val visited = Array.fill(n)(false)
     val stack = mutable.Stack[Int]()
-    val vs = 0 until n
-    for(v <- vs) {
-      if(!visited(v)) {
+    for (v <- order) {
+      if (!visited(v)) {
         stack.push(v)
-        while(!stack.isEmpty) {
+        while (!stack.isEmpty) {
           val c = stack.head
           visited(c) = true
-          val toVisit = reversed.adj(c).filterNot(visited(_))
-          if(toVisit.isEmpty) {
-            stack.pop()
-            f(c)
-          } else {
-            stack.push(toVisit.head)
-          }
-        }
-      }
-    }
-  }
-
-  def dfsLoop3(order: Iterable[Int])(f: (Int, Int) => Unit) {
-    val visited = Array.fill(n)(false)
-    val stack = mutable.Stack[Int]()
-    for(v <- order) {
-      if(!visited(v)) {
-        stack.push(v)
-        while(!stack.isEmpty) {
-          val c = stack.head
-          visited(c) = true
-          val toVisit = adj(c).filterNot(visited(_))
-          if(toVisit.isEmpty) {
+          val toVisit = adj(c).filterNot(visited)
+          if (toVisit.isEmpty) {
             stack.pop()
             f(c, v)
           } else {
@@ -138,24 +52,133 @@ class Digraph private (val n: Int, val adj: Vector[List[Int]])  {
         }
       }
     }
-
   }
 
-  // Sizes of strongly connected components using Kosaraju's algorithm
-  def scc = {
+  def dfs = {
+    val order = mutable.Queue[Int]()
+    val visited = Array.fill(n) {
+      false
+    }
+    val stack = mutable.Stack[Int]()
+
+    for (start <- 0 until n) {
+      if (!visited(start)) {
+        stack.push(start)
+
+        while (!stack.isEmpty) {
+          val v = stack.pop()
+          order.enqueue(v)
+          visited(v) = true // only needed for start
+          val toVisit = adj(v).filterNot(visited)
+          for (w <- toVisit) {
+            visited(w) = true
+            stack.push(w)
+          }
+        }
+      }
+    }
+    order
+  }
+
+  // Gabow's path-base strongly connected components
+  def sccPathBased: Seq[Int] = {
+    val s = mutable.Stack[Int]()
+    val b = mutable.Stack[Int]()
+    val i = Array.fill(n) { -1 }
+    val visited = Array.fill(n) {
+      false
+    }
+    var c = n - 1
+
+    def dfs(v: Int): Unit = {
+      s.push(v)
+      i(v) = s.size - 1
+      b.push(i(v))
+      for (w <- adj(v)) {
+        if (i(w) == -1) {
+          dfs(w)
+        } else {
+          while (i(w) < b.head) {
+            b.pop()
+          }
+        }
+      }
+      if (i(v) == b.head) {
+        b.pop()
+        c += 1
+        while (i(v) <= s.size - 1) {
+          i(s.pop()) = c
+        }
+      }
+    }
+
+    for (v <- 0 until n) {
+      if (i(v) == -1) dfs(v)
+    }
+
+    i.toSeq
+  }
+
+  def reversed: Digraph = {
+    val g = Digraph(n)
+    for (v <- 0 until n; w <- adj(v)) {
+      g.addEdge(w, v)
+    }
+    g
+  }
+
+  // Strongly connected components using Kosaraju's algorithm
+  def sccKosaraju: Seq[Int] = {
     val finishingTimes = Array.fill(n)(0)
     var t = 0
     val leaders = Array.fill(n)(0)
-
-    reversed.dfsLoop3(0 until n) { (x,_) =>
+    reversed.dfsLoop(0 until n) { (x, _) =>
       finishingTimes(x) = t
-      t+=1
+      t += 1
+    }
+    dfsLoop((0 until n).sortBy { x => -finishingTimes(x)}) { (x, leader) => leaders(x) = leader}
+    leaders
+  }
+
+
+  // Strongly connected components using Tarjan's algorithm
+  def sccTarjan: Seq[Int] = {
+    val marked = Array.ofDim[Boolean](n)
+    val stack = mutable.Stack[Int]()
+    val id = Array.ofDim[Int](n)
+    val low = Array.ofDim[Int](n)
+    var pre = 0
+    var count = 0
+
+
+    def sccIter(v: Int): Unit = {
+      marked(v) = true
+      pre += 1
+      low(v) = pre
+      var min = low(v)
+      stack.push(v)
+      for (w <- adj(v)) {
+        if (!marked(w)) sccIter(w)
+        if (low(w) < min) min = low(w)
+      }
+      if (min < low(v)) {
+        low(v) = min
+        return
+      }
+      var w = 0
+      do {
+        w = stack.pop()
+        id(w) = count
+        low(w) = n
+      } while (w != v)
+      count += 1
     }
 
-    dfsLoop3((0 until n).sortBy { x => -finishingTimes(x) }) { (x, leader) => leaders(x) = leader }
-
-    val m = mutable.Map[Int, Int]().withDefaultValue(0)
-    leaders foreach { l => m(l) = m(l) + 1 }
-    m.toList
+    for (i <- 0 until n) {
+      if (!marked(i)) {
+        sccIter(i)
+      }
+    }
+    id.toSeq
   }
 }

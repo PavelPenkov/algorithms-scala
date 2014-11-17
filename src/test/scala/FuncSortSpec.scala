@@ -1,11 +1,9 @@
 package me.penkov.inversions
 
-import org.scalatest.FunSpec
-import org.scalatest.matchers.ShouldMatchers
+import org.scalatest._
 import scala.util.Random
-import scala.collection.immutable.Stream.Empty
 
-class FuncSortSpec extends FunSpec with ShouldMatchers {
+class FuncSortSpec extends FunSpec with Matchers {
   val rng = new Random()
 
   describe("Functional merge") {
@@ -16,7 +14,7 @@ class FuncSortSpec extends FunSpec with ShouldMatchers {
       FuncSort.streamMerge(l, r) should equal(Stream(1, 2, 3, 4, 5, 6))
     }
 
-    ignore("large lists") {
+    it("large lists") {
       val l = 1.to(100000, 2).toList
       val r = 2.to(100000, 2).toList
 

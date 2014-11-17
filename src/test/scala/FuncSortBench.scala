@@ -23,9 +23,7 @@ class FuncSortBench extends FunSpec {
       it(s"first element only $k") {
         val xs = rng.shuffle((1 to k).toList).toStream
 
-        val ts = Benchmark.realtime {
-          println(FuncSort.streamSort(xs).head)
-        }
+        val x = FuncSort.streamSort(xs).head
 
         // info(s"Min only: $k elements in $ts ms")
       }
