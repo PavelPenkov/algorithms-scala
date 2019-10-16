@@ -4,6 +4,7 @@ pipeline {
     stage('do shit') {
       steps {
         sh 'echo "Hello"'
+        input(message: 'Name?', id: 'name', ok: 'string')
       }
     }
   }
